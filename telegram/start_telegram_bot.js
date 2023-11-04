@@ -68,7 +68,18 @@ const limit = 99999;
 const markdown = {parse_mode: 'Markdown'};
 const maxCommandDelayMs = 1000 * 10;
 const restartSubscriptionTimeMs = 1000 * 30;
-const sanitize = n => (n || '').replace(/_/g, '\\_').replace(/[*~`]/g, '');
+const sanitize = n => (n || '').replace(/_/g, '\\_').replace(/[*~`]/g, ''); 
+
+// Added by MB
+const { execSync } = require('child_process');
+const { readFileSync, unlinkSync } = require('fs');
+
+const { allowed_user } = require('./config.json');
+const allowed_user_err = [401, 'Unauthorized Access'];
+var Promise = require('bluebird');
+const max_chars = 1024 // Max chars per Telegram message (Normal user: 1024 / Premium user: 2048)
+//const markup = {parse_mode: 'MarkdownV2'};
+const markup = {parse_mode: 'HTML'};
 
 /** Start a Telegram bot
 
@@ -136,7 +147,7 @@ module.exports = (args, cbk) => {
 
         return cbk();
       },
-
+      
       // Get node info
       getNodes: ['validate', ({}, cbk) => {
         return asyncMap(args.lnds, (lnd, cbk) => {
@@ -186,7 +197,189 @@ module.exports = (args, cbk) => {
 
           return next();
         });
+        
+        /*---------------------------------------------------------------------------------*/
+        // functions to send multiple messages in sequence by MB
+        function sendMessages(ctx, messages) {
+          //console.log(messages.length)
+          return Promise.mapSeries(messages, function(message) {
+            return ctx.reply(message, markup);            
+          });
+        }
+        
+        function prepareMessages(ctx, output, count) {
+          let output_l = [];
+          if (output.length > max_chars) {
+            let out_arr = output.split("\n")
+            let temp_output = "";
+            out_arr.forEach(_output => {
+              if ((_output.length + temp_output.length + 8) < max_chars) {
+                temp_output += _output + "\n";
+              } else {
+                output_l.push(temp_output);
+                temp_output = _output + "\n";
+              }
+            });
+            output_l.push(temp_output);            
+          } else {
+            output_l.push(output);            
+          }
+          if (count != 0 && output_l.length > count) {
+            output_l.length = count;
+            for (let i = 0; i < output_l.length; i++) {
+                if (i < output_l.length) {
+                  output_l[i] += '... more';
+                }
+            }
+            
+          }
+          sendMessages(ctx, output_l, count);
+        }
+        
+        function log_error(user_from, user_command) {
+          allowed_user_err.splice(allowed_user_err.indexOf("Unauthorized Access"), 1, "Unauthorized /" + user_command + " [FN: " + user_from.first_name + ", LN: " + user_from.last_name + ", UN: @" + user_from.username + ", ID: " + user_from.id + ")]");
+          args.logger.error({allowed_user_err});
+        }
+        
+        // custom commands by MB
+        // Handle command to get the channels
+        args.bot.command('channels', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = execSync('/data/rebalance-lnd/rebalance.py -c -g').toString();
+            try {
+              prepareMessages(ctx, output, 0);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "channels");
+          }
+        });
+        
+        // Handle command to get the disk space
+        args.bot.command('disk', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = execSync('/data/rebalance-lnd/custom.py -t disk').toString();
+            //output = execSync('df -h').toString().split('\n')[2];
 
+            try {
+              prepareMessages(ctx, output, 0);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "disk");
+          }
+        });
+        
+        // Handle command to get the forwards
+        args.bot.command('earn', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = execSync('/data/rebalance-lnd/custom.py -t earn').toString();
+            //output = execSync('df -h').toString().split('\n')[2];
+
+            try {
+              prepareMessages(ctx, output, 1);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "earn");
+          }
+        });
+        
+        // Handle command to get the forwards
+        args.bot.command('forwards', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = execSync('/data/rebalance-lnd/rebalance.py -c -w -g').toString();
+            //output = execSync('df -h').toString().split('\n')[2];
+
+            try {
+              prepareMessages(ctx, output, 1);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "forwards");
+          }
+        });
+        
+        // Handle command to get the htlcs
+        args.bot.command('htlcs', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = execSync('/data/rebalance-lnd/custom.py -t htlcs -l').toString();
+
+            try {
+              prepareMessages(ctx, output, 1);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "htlcs");
+          }
+        });
+        
+        // Handle command to get the bos rebalances
+        args.bot.command('running', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = execSync('/data/rebalance-lnd/custom.py -t bos -l').toString();
+
+            try {
+              prepareMessages(ctx, output, 1);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "running");
+          }
+        });
+        
+        // Handle command to get rebalances
+        args.bot.command('rebalances', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = execSync('/data/rebalance-lnd/custom.py -t rebalances -s -d 7').toString();
+
+            try {
+              prepareMessages(ctx, output, 1);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "rebalances");          
+          }
+        });
+        
+        // Handle command to reconnect
+        args.bot.command('reconnect', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = await execSync('/data/rebalance-lnd/custom.py -t reconnect').toString();
+
+            try {
+              prepareMessages(ctx, output, 0);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "reconnect");
+          }
+        });
+        
+        args.bot.command('updates', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = execSync('/usr/local/bin/lncli listchannels | jq -r \'.[][] | [.num_updates, .peer_alias] | @tsv\' | sort -rn').toString();
+
+            try {
+              prepareMessages(ctx, output, 0);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "updates");
+          }
+        });
+        
+        /*---------------------------------------------------------------------------------*/
+        
         // Handle command to get backups
         args.bot.command('backup', async ctx => {
           try {
@@ -198,7 +391,7 @@ module.exports = (args, cbk) => {
               send: (n, opts) => ctx.replyWithDocument(fileAsDoc(n), opts),
             });
           } catch (err) {
-            args.logger.error({err});
+            args.logger.error({err});            
           }
         });
 
@@ -227,7 +420,7 @@ module.exports = (args, cbk) => {
           },
           err => !!err ? args.logger.error({err}) : null);
         });
-
+        
         // Handle command to get the connect id
         args.bot.command('connect', ctx => {
           handleConnectCommand({
@@ -238,7 +431,7 @@ module.exports = (args, cbk) => {
         });
 
         // Handle command to view costs over the past week
-        args.bot.command('costs', async ctx => {
+        /*args.bot.command('costs', async ctx => {
           try {
             await handleCostsCommand({
               from: ctx.message.from.id,
@@ -251,10 +444,10 @@ module.exports = (args, cbk) => {
           } catch (err) {
             args.logger.error({err});
           }
-        });
-
+        });*/
+        
         // Handle command to view earnings over the past week
-        args.bot.command('earnings', async ctx => {
+        /* args.bot.command('earnings', async ctx => {
           try {
             await handleEarningsCommand({
               from: ctx.message.from.id,
@@ -266,10 +459,10 @@ module.exports = (args, cbk) => {
           } catch (err) {
             args.logger.error({err});
           }
-        });
+        }); */
 
         // Handle command to look up nodes in the graph
-        args.bot.command('graph', async ctx => {
+        /*args.bot.command('graph', async ctx => {
           try {
             await handleGraphCommand({
               from: ctx.message.from.id,
@@ -283,7 +476,7 @@ module.exports = (args, cbk) => {
           } catch (err) {
             args.logger.error({err});
           }
-        });
+        });*/
 
         // Handle command to look up wallet info
         args.bot.command('info', async ctx => {
@@ -355,7 +548,7 @@ module.exports = (args, cbk) => {
         });
 
         // Handle command to pay a payment request
-        args.bot.command('pay', async ctx => {
+        /*args.bot.command('pay', async ctx => {
           const budget = paymentsLimit;
 
           if (!budget) {
@@ -383,7 +576,7 @@ module.exports = (args, cbk) => {
           } catch (err) {
             args.logger.error({payment_error: err});
           }
-        });
+        });*/
 
         // Handle command to view pending transactions
         args.bot.command('pending', async ctx => {
@@ -399,7 +592,15 @@ module.exports = (args, cbk) => {
             args.logger.error({err});
           }
         });
-
+        
+        // Handle command to start the bot
+        args.bot.command('start', ctx => {
+          handleStartCommand({
+            id: connectedId,
+            reply: n => ctx.reply(n, markdown),
+          });
+        });
+        
         // Handle command to start the bot
         args.bot.command('start', ctx => {
           handleStartCommand({
@@ -409,7 +610,7 @@ module.exports = (args, cbk) => {
         });
 
         // Terminate the running bot
-        args.bot.command('stop', async ctx => {
+        /*args.bot.command('stop', async ctx => {
           try {
             await handleStopCommand({
               from: ctx.message.from.id,
@@ -419,7 +620,7 @@ module.exports = (args, cbk) => {
           } catch (err) {
             args.logger.error({err});
           }
-        });
+        });*/
 
         // Handle command to view the current version
         args.bot.command('version', async ctx => {
@@ -434,32 +635,46 @@ module.exports = (args, cbk) => {
             });
           } catch (err) {
             args.logger.error({err});
-          }
+          }          
         });
 
         // Handle command to get help with the bot
         args.bot.command('help', async ctx => {
-          const commands = [
-            '/backup - Get node backup file',
-            '/blocknotify - Notification on next block',
-            '/connect - Connect bot',
-            '/costs - View costs over the past week',
-            '/earnings - View earnings over the past week',
-            '/graph <pubkey or peer alias> - Show info about a node',
-            '/info - Show wallet info',
-            '/invoice [amount] [memo] - Make an invoice',
-            '/liquidity [with] - View node liquidity',
-            '/mempool - BTC mempool report',
-            '/pay - Pay an invoice',
-            '/pending - View pending channels, probes, and forwards',
-            '/stop - Stop bot',
-            '/version - View the current bot version',
-          ];
+          if (ctx.message.from.id == allowed_user) {
+            const commands = [
+              '/backup - Get node backup file',
+              '/blocknotify - Notification on next block',
+              '/channels - Show list of channels',
+              '/connect - Connect bot',
+              //'/costs - View costs over the past week',
+              '/disk - Get free disk space on node',
+              '/earn - Show earnings over the past week',
+              //'/earnings - View earnings over the past week',
+              '/forwards - Show forwards for the past 24 hours',
+              //'/graph <pubkey or peer alias> - Show info about a node',
+              '/htlcs - Get pending HTLCs',
+              '/info - Show wallet info',
+              '/invoice [amount] [memo] - Make an invoice',
+              '/liquidity [with] - View node liquidity',
+              '/mempool - BTC mempool report',
+              //'/pay - Pay an invoice',
+              '/pending - Show pending channels, probes, and forwards',
+              '/reconnect - Run bos reconnect',
+              '/rebalances - Show summary of rebalances for last 7 days',
+              '/running - Show running bos rebalances',
+              //'/stop - Stop bot',
+              '/updates - Show channels with the most updates',
+              '/version - View the current bot version',
+            ];
 
-          try {
-            await ctx.reply(`🤖\n${commands.join('\n')}`);
-          } catch (err) {
-            args.logger.error({err});
+            try {
+              await ctx.reply(`🤖\n${commands.join('\n')}`);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx.message.from, "help");
+            //await ctx.reply("Missing rights");
           }
         });
 
@@ -549,18 +764,27 @@ module.exports = (args, cbk) => {
           {command: 'backup', description: 'Get node backup file'},
           {command: 'balance', description: 'Show funds on the node'},
           {command: 'blocknotify', description: 'Get notified on next block'},
-          {command: 'connect', description: 'Get connect code for the bot'},
-          {command: 'costs', description: 'Show costs over the week'},
-          {command: 'earnings', description: 'Show earnings over the week'},
-          {command: 'graph', description: 'Show info about a node'},
+          {command: 'channels', description: 'Show list of channels'},
+          //{command: 'connect', description: 'Get connect code for the bot'},
+          //{command: 'costs', description: 'Show costs over the week'},
+          {command: 'disk', description: 'Get free disk space of node'},
+          {command: 'earn', description: 'Show earnings over the week'},
+          //{command: 'earnings', description: 'Show earnings over the week'},
+          {command: 'forwards', description: 'Show forwards for the past 24 hours'},
+          //{command: 'graph', description: 'Show info about a node'},
+          {command: 'htlcs', description: 'Get pending HTLCs'},
           {command: 'help', description: 'Show the list of commands'},
           {command: 'info', description: 'Show wallet info'},
           {command: 'invoice', description: 'Create an invoice [amt] [memo]'},
           {command: 'liquidity', description: 'Get liquidity [with-peer]'},
           {command: 'mempool', description: 'Get info about the mempool'},
-          {command: 'pay', description: 'Pay a payment request'},
-          {command: 'pending', description: 'Get pending forwards, channels'},
-          {command: 'stop', description: 'Stop the bot'},
+          //{command: 'pay', description: 'Pay a payment request'},
+          {command: 'pending', description: 'Show pending forwards, channels'},
+          {command: 'rebalances', description: 'Show summary of rebalances for last 7 days'},
+          {command: 'reconnect', description: 'Run bos reconnect'},
+          {command: 'running', description: 'Show running bos rebalances'},
+          //{command: 'stop', description: 'Stop the bot'},
+          {command: 'updates', description: 'Show channels with the most updates'},
           {command: 'version', description: 'View current bot version'},
         ]);
       }],
