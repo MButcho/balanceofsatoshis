@@ -106,6 +106,7 @@ test(`Open channels`, async () => {
             },
             capacities: [],
             cooperative_close_addresses: [],
+            commitments: [],
             fs: {getFile: () => {}},
             gives: [],
             logger: {info: log, error: log},

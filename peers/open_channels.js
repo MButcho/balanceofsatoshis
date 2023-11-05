@@ -48,6 +48,8 @@ const {fromHex} = Transaction;
 const interval = 1000;
 const {isArray} = Array;
 const isPublicKey = n => !!n && /^0[2-3][0-9A-F]{64}$/i.test(n);
+const isUnknown = (a1, a2) => a1.findIndex(n => !a2.includes(n)) !== -1;
+const knownCommits = ['default', 'simplified_taproot'];
 const knownTypes = ['private', 'private-trusted', 'public', 'public-trusted'];
 const lineBreak = '\n';
 const noInternalFundingVersions = ['0.11.0-beta', '0.11.1-beta'];
@@ -68,6 +70,7 @@ const utxoPollingTimes = 20;
   {
     ask: <Ask For Input Function>
     capacities: [<New Channel Capacity Tokens String>]
+    commitments: [<Channel Commitment Types String>]
     cooperative_close_addresses: [<Cooperative Close Address>]
     fs: {
       getFile: <Read File Contents Function> (path, cbk) => {}
@@ -103,6 +106,10 @@ module.exports = (args, cbk) => {
           return cbk([400, 'ExpectedChannelCapacitiesToOpenChannels']);
         }
 
+        if (!isArray(args.commitments)) {
+          return cbk([400, 'ExpectedArrayOfChannelOutputTypesToOpenChannels']);
+        }
+
         if (!isArray(args.cooperative_close_addresses)) {
           return cbk([400, 'ExpectedCooperativeCloseAddressesArray']);
         }
@@ -133,6 +140,7 @@ module.exports = (args, cbk) => {
 
         const closeAddrCount = args.cooperative_close_addresses.length;
         const hasCapacities = !!args.capacities.length;
+        const hasCommitments = !!args.commitments.length;
         const hasGives = !!args.gives.length;
         const hasFeeRates = !!args.set_fee_rates.length;
         const hasNodes = !!args.opening_nodes.length;
@@ -140,6 +148,10 @@ module.exports = (args, cbk) => {
 
         if (!!hasCapacities && publicKeysLength !== args.capacities.length) {
           return cbk([400, 'CapacitiesMustBeSpecifiedForEveryPublicKey']);
+        }
+
+        if (!!hasCommitments && publicKeysLength !== args.commitments.length) {
+          return cbk([400, 'CommitmentTypesMustBeSpecifiedForEveryPublicKey']);
         }
 
         if (!!closeAddrCount && publicKeysLength !== closeAddrCount) {
@@ -172,6 +184,10 @@ module.exports = (args, cbk) => {
 
         if (args.types.findIndex(n => !knownTypes.includes(n)) !== notFound) {
           return cbk([400, 'UnknownChannelType', {channel_types: knownTypes}]);
+        }
+
+        if (isUnknown(args.commitments, knownCommits)) {
+          return cbk([400, 'UnknownCommitment', {commitments: knownCommits}]);
         }
 
         if (!!args.types.length && args.types.length !== publicKeysLength) {
@@ -263,6 +279,7 @@ module.exports = (args, cbk) => {
         const {opens} = channelsFromArguments({
           capacities,
           addresses: args.cooperative_close_addresses,
+          commitments: args.commitments,
           gives: args.gives,
           nodes: args.public_keys,
           rates: args.set_fee_rates,
@@ -445,6 +462,7 @@ module.exports = (args, cbk) => {
             cooperative_close_address: channel.cooperative_close_address,
             give_tokens: channel.give_tokens,
             is_private: channel.is_private,
+            is_simplified_taproot: channel.is_simplified_taproot,
             is_trusted_funding: channel.is_trusted_funding,
             lnd: getLnds.find(n => n.node === node).lnd,
             partner_public_key: channel.partner_public_key,
@@ -457,6 +475,7 @@ module.exports = (args, cbk) => {
             cooperative_close_address: test.cooperative_close_address,
             give_tokens: test.give_tokens,
             is_private: test.is_private,
+            is_simplified_taproot: test.is_simplified_taproot,
             is_trusted_funding: test.is_trusted_funding,
             lnd: test.lnd,
             partner_public_key: test.partner_public_key,

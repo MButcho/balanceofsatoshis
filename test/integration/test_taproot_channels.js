@@ -24,11 +24,18 @@ const log = () => {};
 const size = 2;
 const times = 1000;
 
-// Opening channels should open channels with specified nodes
-test(`Open channels`, async () => {
-  const {kill, nodes} = await spawnLightningCluster({size});
+// Opening taproot channels should open channels with specified nodes
+test(`Open taproot channels`, async () => {
+  const {kill, nodes} = await spawnLightningCluster({
+    size,
+    lnd_configuration: [
+      '--maxpendingchannels=10',
+      '--protocol.option-scid-alias',
+      '--protocol.simple-taproot-chans',
+    ],
+  });
 
-  const [{generate, lnd}, target] = nodes;
+  const [{generate, id, lnd}, target] = nodes;
 
   try {
     await generate({count});
@@ -49,13 +56,13 @@ test(`Open channels`, async () => {
       return await createChainAddress({lnd});
     });
 
-    await delay(4000);
-
-    // Open a single channel from a single node
+    // Propose a taproot channel
     await asyncAuto({
-      // Open channel
+      // Propose the taproot channel to target
       propose: async () => {
         return asyncRetry({interval, times}, async () => {
+          await addPeer({lnd, public_key: target.id, socket: target.socket});
+
           await openChannels({
             lnd,
             ask: async (args, cbk) => {
@@ -65,10 +72,12 @@ test(`Open channels`, async () => {
 
               if (args.name === 'fund') {
                 const address = args.message.split(' ')[9];
+                const amount = args.message.split(' ')[7];
 
+                // Provide funding
                 const {psbt} = await fundPsbt({
                   lnd,
-                  outputs: [{address, tokens: 6e6}],
+                  outputs: [{address, tokens: amount * 1e8}],
                 });
 
                 const signed = await signPsbt({lnd, psbt});
@@ -78,17 +87,17 @@ test(`Open channels`, async () => {
 
               throw new Error('UnrecognizedParameter');
             },
-            capacities: ['6*m'],
-            commitments: [],
-            cooperative_close_addresses: [address],
+            capacities: [],
+            cooperative_close_addresses: [],
+            commitments: ['simplified_taproot'],
             fs: {getFile: () => {}},
-            gives: [1e5],
+            gives: [],
             logger: {info: log, error: log},
             opening_nodes: [],
             public_keys: [target.id],
             request: () => {},
             set_fee_rates: [],
-            types: [],
+            types: ['private'],
           });
         });
       },
@@ -106,11 +115,14 @@ test(`Open channels`, async () => {
 
           const [channel] = channels;
 
-          equal(channel.remote_balance, 1e5, 'Gift balance is reflected');
-          equal(channel.capacity, 6e6, 'Channel capacity is set');
-          equal(channel.cooperative_close_address, address, 'Coop address');
+          equal(channel.type, 'simplified_taproot', 'Taproot channel opened');
         });
       },
+
+      // Stop the target node
+      finish: ['generate', 'propose', async ({}) => {
+        await target.kill({});
+      }],
     });
   } catch (err) {
     equal(err, null, 'Expected no error');

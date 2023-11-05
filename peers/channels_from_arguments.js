@@ -1,5 +1,6 @@
 const defaultChannelCapacity = 5e6;
 const defaultChannelDescription = 'bos open';
+const isSimpleP2tr = (arr, i) => !!arr[i] && arr[i] === 'simplified_taproot';
 const isTrusted = type => ['private-trusted', 'public-trusted'].includes(type);
 const numericFeeRate = n => !!n && /^\d+$/.test(n) ? Number(n) : undefined;
 const privateTypes = ['private', 'private-trusted'];
@@ -11,6 +12,7 @@ const uniq = arr => Array.from(new Set(arr));
   {
     addresses: [<Address String>]
     capacities: [<Channel Capacity Tokens Number>]
+    commitments: [<Channel Commitment Types String>]
     gives: [<Give Tokens String>]
     nodes: [<Channel Partner Node Identity Public Key Hex String>]
     rates: [<Set Fee Rate String>]
@@ -27,6 +29,7 @@ const uniq = arr => Array.from(new Set(arr));
         description: <Channel Description String>
         [give_tokens]: <Give Tokens Number>
         is_private: <Channel Is Private Bool>
+        is_simplified_taproot: <Channel Is Taproot Bool>
         partner_public_key: <Channel Partner Identity Public Key Hex String>
         [rate]: <Set Fee Rate String>
       }]
@@ -43,6 +46,7 @@ module.exports = args => {
       fee_rate: numericFeeRate(args.rates[i]),
       give_tokens: !!args.gives[i] ? Number(args.gives[i]) : undefined,
       is_private: !!args.types[i] && privateTypes.includes(args.types[i]),
+      is_simplified_taproot: isSimpleP2tr(args.commitments, i),
       is_trusted_funding: !!args.types[i] && isTrusted(args.types[i]),
       node: args.saved[i] || undefined,
       partner_public_key: key,
