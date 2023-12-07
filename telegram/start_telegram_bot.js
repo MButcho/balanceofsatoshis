@@ -236,9 +236,11 @@ module.exports = (args, cbk) => {
           sendMessages(ctx, output_l, count);
         }
         
-        function log_error(user_from, user_command) {
+        function log_error(ctx, user_command) {
+          user_from = ctx.message.from;
           allowed_user_err.splice(allowed_user_err.indexOf("Unauthorized Access"), 1, "Unauthorized /" + user_command + " [FN: " + user_from.first_name + ", LN: " + user_from.last_name + ", UN: @" + user_from.username + ", ID: " + user_from.id + ")]");
           args.logger.error({allowed_user_err});
+          prepareMessages(ctx, "You do not have rights to use this bot and your ID " + user_from.id + " was logged!", 0);
         }
         
         // custom commands by MB
@@ -252,7 +254,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "channels");
+            log_error(ctx, "channels");
           }
         });
         
@@ -268,7 +270,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "disk");
+            log_error(ctx, "disk");
           }
         });
         
@@ -284,7 +286,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "earn");
+            log_error(ctx, "earn");
           }
         });
         
@@ -300,7 +302,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "forwards");
+            log_error(ctx, "forwards");
           }
         });
         
@@ -315,7 +317,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "htlcs");
+            log_error(ctx, "htlcs");
           }
         });
         
@@ -330,7 +332,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "running");
+            log_error(ctx, "running");
           }
         });
         
@@ -345,7 +347,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "rebalances");          
+            log_error(ctx, "rebalances");          
           }
         });
         
@@ -360,7 +362,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "reconnect");
+            log_error(ctx, "reconnect");
           }
         });
         
@@ -374,7 +376,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "updates");
+            log_error(ctx, "updates");
           }
         });
         
@@ -391,7 +393,8 @@ module.exports = (args, cbk) => {
               send: (n, opts) => ctx.replyWithDocument(fileAsDoc(n), opts),
             });
           } catch (err) {
-            args.logger.error({err});            
+            //args.logger.error({err});
+            log_error(ctx, "backup");
           }
         });
 
@@ -406,7 +409,8 @@ module.exports = (args, cbk) => {
               working: () => ctx.replyWithChatAction('typing'),
             });
           } catch (err) {
-            args.logger.error({err});
+            //args.logger.error({err});
+            log_error(ctx, "balance");
           }
         });
 
@@ -418,7 +422,7 @@ module.exports = (args, cbk) => {
             reply: n => ctx.reply(n, markdown),
             request: args.request,
           },
-          err => !!err ? args.logger.error({err}) : null);
+          err => !!err ? log_error(ctx, "blocknotify") : null);
         });
         
         // Handle command to get the connect id
@@ -489,7 +493,8 @@ module.exports = (args, cbk) => {
               reply: (message, options) => ctx.reply(message, options),
             });
           } catch (err) {
-            args.logger.error({err});
+            //args.logger.error({err});
+            log_error(ctx, "info");
           }
         });
 
@@ -503,7 +508,8 @@ module.exports = (args, cbk) => {
               request: args.request,
             });
           } catch (err) {
-            args.logger.error({err});
+            //args.logger.error({err});
+            log_error(ctx, "invoice");
           }
         });
 
@@ -517,7 +523,8 @@ module.exports = (args, cbk) => {
               request: args.request,
             });
           } catch (err) {
-            args.logger.error({err});
+            //args.logger.error({err});
+            log_error(ctx, "mempool");
           }
         });
 
@@ -543,7 +550,8 @@ module.exports = (args, cbk) => {
               });
             });
           } catch (err) {
-            args.logger.error({err});
+            //args.logger.error({err});
+            log_error(ctx, "liquidity");
           }
         });
 
@@ -589,7 +597,8 @@ module.exports = (args, cbk) => {
               working: () => ctx.replyWithChatAction('typing'),
             });
           } catch (err) {
-            args.logger.error({err});
+            //args.logger.error({err});
+            log_error(ctx, "pending");
           }
         });
         
@@ -634,7 +643,8 @@ module.exports = (args, cbk) => {
               reply: n => ctx.reply(n, markdown),
             });
           } catch (err) {
-            args.logger.error({err});
+            //args.logger.error({err});
+            log_error(ctx, "version");
           }          
         });
 
@@ -673,7 +683,7 @@ module.exports = (args, cbk) => {
               args.logger.error({err});
             }
           } else {
-            log_error(ctx.message.from, "help");
+            log_error(ctx, "help");
             //await ctx.reply("Missing rights");
           }
         });
