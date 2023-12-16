@@ -244,7 +244,6 @@ module.exports = (args, cbk) => {
         }
         
         // custom commands by MB
-        // Handle command to get the channels
         args.bot.command('channels', async ctx => {
           if (ctx.message.from.id == allowed_user) {
             var output = execSync('/data/rebalance-lnd/rebalance.py -c -g').toString();
@@ -258,7 +257,6 @@ module.exports = (args, cbk) => {
           }
         });
         
-        // Handle command to get the disk space
         args.bot.command('disk', async ctx => {
           if (ctx.message.from.id == allowed_user) {
             var output = execSync('/data/rebalance-lnd/custom.py -t disk').toString();
@@ -274,7 +272,6 @@ module.exports = (args, cbk) => {
           }
         });
         
-        // Handle command to get the forwards
         args.bot.command('earn', async ctx => {
           if (ctx.message.from.id == allowed_user) {
             var output = execSync('/data/rebalance-lnd/custom.py -t earn').toString();
@@ -290,7 +287,21 @@ module.exports = (args, cbk) => {
           }
         });
         
-        // Handle command to get the forwards
+        args.bot.command('estimate', async ctx => {
+          if (ctx.message.from.id == allowed_user) {
+            var output = execSync('/data/rebalance-lnd/custom.py -t estimatefee').toString();
+            //output = execSync('df -h').toString().split('\n')[2];
+
+            try {
+              prepareMessages(ctx, output, 0);
+            } catch (err) {
+              args.logger.error({err});
+            }
+          } else {
+            log_error(ctx, "estimate");
+          }
+        });
+        
         args.bot.command('forwards', async ctx => {
           if (ctx.message.from.id == allowed_user) {
             var output = execSync('/data/rebalance-lnd/rebalance.py -c -w -g').toString();
@@ -306,7 +317,6 @@ module.exports = (args, cbk) => {
           }
         });
         
-        // Handle command to get the htlcs
         args.bot.command('htlcs', async ctx => {
           if (ctx.message.from.id == allowed_user) {
             var output = execSync('/data/rebalance-lnd/custom.py -t htlcs -l').toString();
@@ -321,7 +331,6 @@ module.exports = (args, cbk) => {
           }
         });
         
-        // Handle command to get the bos rebalances
         args.bot.command('running', async ctx => {
           if (ctx.message.from.id == allowed_user) {
             var output = execSync('/data/rebalance-lnd/custom.py -t bos -l').toString();
@@ -336,7 +345,6 @@ module.exports = (args, cbk) => {
           }
         });
         
-        // Handle command to get rebalances
         args.bot.command('rebalances', async ctx => {
           if (ctx.message.from.id == allowed_user) {
             var output = execSync('/data/rebalance-lnd/custom.py -t rebalances -s -d 7').toString();
@@ -351,7 +359,6 @@ module.exports = (args, cbk) => {
           }
         });
         
-        // Handle command to reconnect
         args.bot.command('reconnect', async ctx => {
           if (ctx.message.from.id == allowed_user) {
             var output = await execSync('/data/rebalance-lnd/custom.py -t reconnect').toString();
@@ -657,12 +664,13 @@ module.exports = (args, cbk) => {
               '/channels - Show list of channels',
               '/connect - Connect bot',
               //'/costs - View costs over the past week',
-              '/disk - Get free disk space on node',
+              '/disk - Show free disk space',
               '/earn - Show earnings over the past week',
+              '/estimate - Show BTC fee estimate',
               //'/earnings - View earnings over the past week',
               '/forwards - Show forwards for the past 24 hours',
               //'/graph <pubkey or peer alias> - Show info about a node',
-              '/htlcs - Get pending HTLCs',
+              '/htlcs - Show pending HTLCs',
               '/info - Show wallet info',
               '/invoice [amount] [memo] - Make an invoice',
               '/liquidity [with] - View node liquidity',
@@ -777,12 +785,13 @@ module.exports = (args, cbk) => {
           {command: 'channels', description: 'Show list of channels'},
           //{command: 'connect', description: 'Get connect code for the bot'},
           //{command: 'costs', description: 'Show costs over the week'},
-          {command: 'disk', description: 'Get free disk space of node'},
+          {command: 'disk', description: 'Show free disk space of node'},
           {command: 'earn', description: 'Show earnings over the week'},
+          {command: 'estimate', description: 'Show BTC fee estimate'},
           //{command: 'earnings', description: 'Show earnings over the week'},
           {command: 'forwards', description: 'Show forwards for the past 24 hours'},
           //{command: 'graph', description: 'Show info about a node'},
-          {command: 'htlcs', description: 'Get pending HTLCs'},
+          {command: 'htlcs', description: 'Show pending HTLCs'},
           {command: 'help', description: 'Show the list of commands'},
           {command: 'info', description: 'Show wallet info'},
           {command: 'invoice', description: 'Create an invoice [amt] [memo]'},
