@@ -829,6 +829,7 @@ prog
   .help('Obtain an inbound channel from a node on the network')
   .argument('[service]', 'Public key identity of node to get channel from')
   .option('--amount <tokens>', 'Capacity of inbound channel desired', INT, 5e6)
+  .option('--days <days>', 'Minimum days expected for channel lifetime')
   .option('--dryrun <dryrun>', 'Request a price quote only')
   .option('--max-wait-hours <hours>', 'Hours to wait for the open', INT, 48)
   .option('--node <node_name>', 'Node to get inbound channel for')
@@ -843,6 +844,7 @@ prog
           capacity: options.amount,
           fs: {getFile: readFile},
           is_dry_run: !!options.dryrun,
+          lifetime: options.days,
           lnd: (await lndForNode(logger, options.node)).lnd,
           max_wait_hours: options.maxWaitHours,
           recovery: options.recovery,
@@ -1299,7 +1301,6 @@ prog
   .option('--min-capacity <tokens>', 'Minimum channel capacity', INT, 1e6)
   .option('--node <node_name>', 'Node to offer channels on')
   .option('--private-fee-rate <ppm>', 'Add private capacity charge', INT, 1000)
-  .option('--website <url>', 'URL to advertise as informational website')
   .action((args, options, logger) => {
     return new Promise(async (resolve, reject) => {
       try {
@@ -1312,7 +1313,6 @@ prog
           min_capacity: options.minCapacity,
           orders: new Map(),
           private_fee_rate: options.privateFeeRate,
-          website: options.website,
         },
         responses.returnObject({logger, reject, resolve}));
       } catch (err) {

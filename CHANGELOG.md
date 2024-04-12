@@ -1,6 +1,23 @@
 # Versions
 
-## 17.9.1
+## 18.1.0
+
+- `swap`: Add support for sending to an external address via Loop Out
+
+## 18.0.0
+
+### Breaking Changes
+
+- `get-inbound-channel`: Protocol change is not compatible with previous
+- `offer-channel-open`: The `--website` option is no longer supported
+
+## 17.10.0
+
+- `get-inbound-channel`: Add `--days` to specify minimum expected channel life
+- `offer-channel-open`: Correct client error messaging issue
+- `offer-channel-open`: Correct issue where PPM was overpriced vs description
+
+## 17.9.3
 
 - `connect`: Add command to attempt to peer with a node
 
