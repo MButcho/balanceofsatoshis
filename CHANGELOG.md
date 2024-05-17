@@ -1,5 +1,22 @@
 # Versions
 
+## 18.2.0
+
+- `call`: Add support for `inbound_base_discount_mtokens` and
+    `inbound_rate_discount` in `updateRoutingFees`
+
+## 18.1.5
+
+- `get-inbound-channel`: Limit max wait hours to the LSPS1 maximum setting
+
+## 18.1.4
+
+- `increase-inbound-liquidity`, `swap`, `swap-in`: Fix auth token purchase
+
+## 18.1.2
+
+- `pay`: Ignore global avoid list avoidance when avoided out peer is specified
+
 ## 18.1.0
 
 - `swap`: Add support for sending to an external address via Loop Out
