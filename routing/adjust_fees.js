@@ -21,15 +21,20 @@ const {formatFeeRate} = require('./../display');
 const {getIcons} = require('./../display');
 const parseFeeRateFormula = require('./parse_fee_rate_formula');
 
+const asRate = rate => formatFeeRate({rate}).display;
 const asTxOut = n => `${n.transaction_id}:${n.transaction_vout}`;
 const {ceil} = Math;
 const flatten = arr => [].concat(...arr);
 const interval = 1000 * 60 * 2;
+const isAllUndefined = arr => arr.findIndex(n => n !== undefined) === -1;
 const {isArray} = Array;
+const isNumber = n => !!n && !isNaN(n);
 const {max} = Math;
+const {min} = Math;
 const minCltvDelta = 18;
 const nodeMatch = /\bFEE_RATE_OF_[0-9A-F]{66}\b/gim;
 const noFee = gray('Unknown Rate');
+const present = (arg, existing) => arg !== undefined ? arg : existing;
 const pubKeyForNodeMatch = n => n.substring(12).toLowerCase();
 const shortKey = key => key.substring(0, 20);
 const sumOf = arr => arr.reduce((sum, n) => sum + n, 0);
@@ -44,6 +49,7 @@ const uniq = arr => Array.from(new Set(arr));
     fs: {
       getFile: <Read File Contents Function> (path, cbk) => {}
     }
+    [inbound_rate_discount]: <Discount Fee Rate Number>
     lnd: <Authenticated LND API Object>
     logger: <Winstone Logger Object>
     to: [<Adjust Routing Fee To Peer Alias or Public Key or Tag String>]
@@ -85,6 +91,16 @@ module.exports = (args, cbk) => {
 
         if (args.fee_rate !== undefined && !args.to.length) {
           return cbk([400, 'SettingGlobalFeeRateNotSupported']);
+        }
+
+        if (args.inbound_rate_discount !== undefined && !args.to.length) {
+          return cbk([400, 'SettingGlobalInboundRateDiscountNotSupported']);
+        }
+
+        if (!!args.inbound_rate_discount) {
+          if (!isNumber(args.inbound_rate_discount)) {
+            return cbk([400, 'ExpectedNumericRateToSetInboundRateDiscount']);
+          }
         }
 
         return cbk();
@@ -243,8 +259,14 @@ module.exports = (args, cbk) => {
         },
         cbk) =>
       {
-        // Exit early when not updating policy
-        if (args.cltv_delta === undefined && args.fee_rate === undefined) {
+        const adjustments = [
+          args.cltv_delta,
+          args.fee_rate,
+          args.inbound_rate_discount,
+        ];
+
+        // Exit early when not updating any policy values
+        if (isAllUndefined(adjustments)) {
           return cbk();
         }
 
@@ -297,10 +319,14 @@ module.exports = (args, cbk) => {
               return {
                 cltv_delta: args.cltv_delta,
                 fee_rate: rate,
+                inbound_rate_discount: args.inbound_rate_discount,
                 transaction_id: channel.transaction_id,
                 transaction_vout: channel.transaction_vout,
               };
             }
+
+            const discount = args.inbound_rate_discount;
+            const inbounds = currentPolicies.map(n => n.inbound_rate_discount);
 
             // Only the highest CLTV delta across all peer channels applies
             const cltvDelta = max(...currentPolicies.map(n => n.cltv_delta));
@@ -308,10 +334,14 @@ module.exports = (args, cbk) => {
             // Only the highest fee rate across all peer channels applies
             const maxFeeRate = max(...currentPolicies.map(n => n.fee_rate));
 
+            // Only the lowest discount rate across all peer channels applies
+            const minInboundDiscountRate = min(...inbounds);
+
             return {
               base_fee_mtokens: baseFeeMillitokens.toString(),
               cltv_delta: args.cltv_delta || cltvDelta,
               fee_rate: rate !== undefined ? rate : maxFeeRate,
+              inbound_rate_discount: present(discount, minInboundDiscountRate),
               transaction_id: channel.transaction_id,
               transaction_vout: channel.transaction_vout,
             };
@@ -337,6 +367,7 @@ module.exports = (args, cbk) => {
               cltv_delta: update.cltv_delta,
               fee_rate: ceil(update.fee_rate),
               from: getPublicKey.public_key,
+              inbound_rate_discount: ceil(update.inbound_rate_discount),
               lnd: args.lnd,
               transaction_id: update.transaction_id,
               transaction_vout: update.transaction_vout,
@@ -398,7 +429,10 @@ module.exports = (args, cbk) => {
             });
           });
 
+          const discounts = peerRates.map(n => n.inbound_rate_discount);
           const rate = max(...peerRates.map(n => n.fee_rate));
+
+          const inboundRateDiscount = min(...discounts);
 
           const nodeIcons = getIcons.nodes.find(n => n.public_key === id);
 
@@ -411,13 +445,14 @@ module.exports = (args, cbk) => {
 
           return {
             alias: display,
+            discount: !peerRates.length ? noFee : asRate(inboundRateDiscount),
             id: id,
             out_fee: !peerRates.length ? noFee : formatFeeRate({rate}).display,
           };
         });
 
         const rows = []
-          .concat([['Peer', 'Out Fee', 'Public Key']])
+          .concat([['Peer', 'Out Fee', 'Inbound Discount', 'Public Key']])
           .concat(peersWithFees
             .filter(peer => {
               if (!args.to.length) {
@@ -432,6 +467,7 @@ module.exports = (args, cbk) => {
               return [
                 isChange ? green(peer.alias) : peer.alias,
                 isChange ? green(peer.out_fee) : peer.out_fee,
+                isChange ? green(peer.discount) : peer.discount,
                 isChange ? green(peer.id) : peer.id,
               ];
             })

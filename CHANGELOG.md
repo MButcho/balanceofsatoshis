@@ -1,5 +1,49 @@
 # Versions
 
+## 19.3.1
+
+- `fund`: Fix validation for funding when using `--select-utxos`
+
+## 19.3.0
+
+- `chainfees`: Add support for `min_relay_feerate` for LND 0.18.3 and higher
+
+## 19.2.2
+
+- `fees`: Add `--set-inbound-rate-discount` to set a source-based rate discount
+
+## 19.1.1
+
+- `call`: Add support for `getPendingSweeps` method to show pending sweeps
+
+## 19.0.5
+
+- `get-inbound-channel`, `offer-channel-open`: Update to new LSPS1 protocol
+
+## 19.0.4
+
+- `offer-channel-open`: Correct PPM fee pricing for custom lifetime lengths
+
+## 19.0.0
+
+- `install-completion`: Add command to install shell tab autocompletion
+- `uninstall-completion`: Add command to remove shell tab autocompletion
+
+### Breaking Changes
+
+The previous autocompletion mode that required editing shell profile is no
+longer supported. To enable or disable autocompletion, run the new install or
+uninstall completion commands.
+
+## 18.2.9
+
+- `graph`: represent inbound fees in policy display
+- `rebalance`: fix support for 0.18.0 inbound fees
+
+## 18.2.1
+
+- Support LND 0.18.0
+
 ## 18.2.0
 
 - `call`: Add support for `inbound_base_discount_mtokens` and

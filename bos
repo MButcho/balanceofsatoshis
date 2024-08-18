@@ -18,7 +18,9 @@ const lnService = importLazy('ln-service');
 const lnSync = importLazy('ln-sync');
 const paidServices = importLazy('paid-services');
 const prog = require('@alexbosworth/caporal');
+const tabtab = importLazy('tabtab');
 
+const autocomplete = require('./commands/autocomplete');
 const commandConstants = require('./commands/constants');
 
 const {accountingCategories} = commandConstants;
@@ -62,6 +64,7 @@ const months = [...Array(12).keys()].map(n => ++n);
 const {REPEATABLE} = prog;
 const {STRING} = prog;
 const yearMatch = /^\d{4}$/;
+
 prog
   .version(version)
 
@@ -701,19 +704,21 @@ prog
     });
   })
 
-  // Show and set outbound fee rates
-  .command('fees', 'Show and adjust outbound fee rates')
+  // Show and set routing policy fee rates
+  .command('fees', 'Show and adjust routing fee rates')
   .help('List out fee rates, fix problems with routing policies, set out fees')
   .help('When setting fee, if channels pending, will wait for confirm to set')
-  .help('Set-fee-rate can use formulas: https://formulajs.info/functions/')
+  .help('--set-fee-rate can use formulas: https://formulajs.info/functions/')
   .help('Specify PERCENT(0.00) to set the fee as a fraction of routed amount')
   .help('Specify BIPS() to set the fee as parts per thousand')
   .help('You can use INBOUND and OUTBOUND in formulas for IF formulas')
   .help('You can use INBOUND_FEE_RATE to mirror an inbound fee')
   .help('You can use FEE_RATE_OF_<PUBKEY> to reference other node rates')
+  .help('--set-inbound-discount-rate is total discount on traffic from peer')
   .option('--node <node_name>', 'Saved node (not peer to set fees on)')
   .option('--set-cltv-delta <count>', 'Set the number of blocks for CLTV', INT)
   .option('--set-fee-rate <rate>', 'Fee in parts per million or use a formula')
+  .option('--set-inbound-rate-discount <rate>', 'Source discount rate in PPM')
   .option('--to <peer>', 'Peer key/alias/tag to set fees', REPEATABLE)
   .action((args, options, logger) => {
     return new Promise(async (resolve, reject) => {
@@ -723,6 +728,7 @@ prog
           cltv_delta: options.setCltvDelta,
           fee_rate: options.setFeeRate,
           fs: {getFile: readFile},
+          inbound_rate_discount: options.setInboundRateDiscount,
           lnd: (await lnd.authenticatedLnd({logger, node: options.node})).lnd,
           to: flatten([options.to].filter(n => !!n)),
         },
@@ -887,6 +893,7 @@ prog
   .argument('<alias_or_public_key>', 'Node in the graph to look up')
   .help('--filter variables: AGE/CAPACITY/HOPS/IN_FEE_RATE/OUT_FEE_RATE')
   .help('Example: --filter "age<7*144" for connections in the last week')
+  .help(' ←-PPM will represent a source-based inbound discount when present')
   .option('--filter <formula>', 'Filter formula to apply', REPEATABLE)
   .option('--node <node_name>', 'Node to use for lookup')
   .option('--sort <sort_connections_by', 'Sort peers by field')
@@ -1071,6 +1078,21 @@ prog
         return logger.error({err}) && reject();
       }
     });
+  })
+
+  // Add tab completions
+  .command('install-completion')
+  .help('Add tab autocompletion to your shell profile')
+  .visible(false)
+  .action(async (args, options, logger) => {
+    try {
+      await tabtab.install({
+        completer: commandConstants.process,
+        name: commandConstants.process,
+      });
+    } catch (err) {
+      return logger.error({err}) && reject();
+    }
   })
 
   // Create an invoice
@@ -2127,6 +2149,18 @@ prog
     });
   })
 
+  // Remove tab completions
+  .command('uninstall-completion')
+  .help('Remove tab autocompletion from your shell profile')
+  .visible(false)
+  .action(async (args, options, logger) => {
+    try {
+      await tabtab.uninstall({name: commandConstants.process});
+    } catch (err) {
+      return logger.error({err}) && reject();
+    }
+  })
+
   // Unlock wallet
   .command('unlock', 'Unlock wallet if locked')
   .help('Check if the wallet is locked, if so use a password file to unlock')
@@ -2195,5 +2229,7 @@ prog
       }
     });
   });
+
+autocomplete({prog});
 
 prog.parse(process.argv);

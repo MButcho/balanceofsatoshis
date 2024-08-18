@@ -10,8 +10,8 @@ const {getHeight} = require('ln-service');
 const {getIdentity} = require('ln-service');
 const {getNode} = require('ln-service');
 const {getPeerLiquidity} = require('ln-sync');
-const {getRouteThroughHops} = require('ln-service');
 const {getWalletVersion} = require('ln-service');
+const moment = require('moment');
 const {parseAmount} = require('ln-accounting');
 const {payViaRoutes} = require('ln-service');
 const {returnResult} = require('asyncjs-util');
@@ -85,6 +85,7 @@ const uniq = arr => Array.from(new Set(arr));
     [out_filters]: [<Outbound Filter Formula String>]
     [out_inbound]: <Outbound Target Inbound Liquidity Tokens Number>
     [out_through]: <Pay Out Through Peer String>
+    [start]: <ISO 8601 Start Date String>
     [timeout_minutes]: <Deadline To Stop Rebalance Minutes Number>
   }
 
@@ -697,39 +698,17 @@ module.exports = (args, cbk) => {
       // Get the current height
       getHeight: ['channels', 'lnd', ({lnd}, cbk) => getHeight({lnd}, cbk)],
 
-      // Get route for rebalance
-      getRoute: ['channels', 'invoice', ({channels, invoice}, cbk) => {
-        return getRouteThroughHops({
-          cltv_delta: cltvDelta,
-          lnd: args.lnd,
-          mtokens: invoice.mtokens,
-          payment: invoice.payment,
-          public_keys: channels.map(n => n.destination),
-          total_mtokens: !!invoice.payment ? invoice.mtokens : undefined,
-        },
-        (err, res) => {
-          // Exit early when there is an error and use local route calculation
-          if (!!err) {
-            return cbk(null, {});
-          }
-
-          return cbk(null, {route: res.route});
-        });
-      }],
-
       // Calculate route for rebalance
       routes: [
         'channels',
         'getHeight',
         'getPublicKey',
-        'getRoute',
         'invoice',
         'tokens',
         ({
           channels,
           getHeight,
           getPublicKey,
-          getRoute,
           invoice,
           tokens,
         },
@@ -746,16 +725,15 @@ module.exports = (args, cbk) => {
             total_mtokens: !!invoice.payment ? invoice.mtokens : undefined,
           });
 
-          const endRoute = getRoute.route || route;
           const maxFee = args.max_fee || defaultMaxFee;
           const maxFeeRate = args.max_fee_rate || defaultMaxFeeRate;
 
-          if (endRoute.tokens < minRebalanceAmount) {
+          if (route.tokens < minRebalanceAmount) {
             return cbk([503, 'EncounteredUnexpectedRouteLiquidityFailure']);
           }
 
           const [highFeeAt] = sortBy({
-            array: endRoute.hops.map(hop => ({
+            array: route.hops.map(hop => ({
               to: hop.public_key,
               fee: hop.fee,
             })),
@@ -763,15 +741,15 @@ module.exports = (args, cbk) => {
           }).sorted.reverse().map(n => n.to);
 
           // Exit early when a max fee is specified and exceeded
-          if (!!maxFee && endRoute.fee > maxFee) {
+          if (!!maxFee && route.fee > maxFee) {
             return cbk([
               400,
               'RebalanceTotalFeeTooHigh',
-              {needed_max_fee: endRoute.fee.toString(), high_fee: highFeeAt},
+              {needed_max_fee: route.fee.toString(), high_fee: highFeeAt},
             ]);
           }
 
-          const feeRate = ceil(endRoute.fee / endRoute.tokens * rateDivisor);
+          const feeRate = ceil(route.fee / route.tokens * rateDivisor);
 
           // Exit early when the max fee rate is specified and exceeded
           if (!!maxFeeRate && feeRate > maxFeeRate) {
@@ -782,14 +760,66 @@ module.exports = (args, cbk) => {
             ]);
           }
 
-          return cbk(null, [endRoute]);
+          return cbk(null, [route]);
         } catch (err) {
           return cbk([500, 'FailedToConstructRebalanceRoute', {err}]);
         }
       }],
 
+      // Calculate the total inbound fee discount
+      discount: [
+        'channels',
+        'getHeight',
+        'getPublicKey',
+        'invoice',
+        'routes',
+        ({
+          channels,
+          getHeight,
+          getPublicKey,
+          invoice,
+          routes,
+          tokens,
+        },
+        cbk) =>
+      {
+        const {route} = routeFromChannels({
+          channels: channels.map(channel => ({
+            capacity: channel.capacity,
+            destination: channel.destination,
+            id: channel.id,
+            policies: channel.policies.map(policy => ({
+              base_fee_mtokens: policy.base_fee_mtokens,
+              cltv_delta: policy.cltv_delta,
+              fee_rate: policy.fee_rate,
+              is_disabled: policy.is_disabled,
+              max_htlc_mtokens: policy.max_htlc_mtokens,
+              min_htlc_mtokens: policy.min_htlc_mtokens,
+              public_key: policy.public_key,
+            })),
+          })),
+          cltv_delta: cltvDelta,
+          destination: getPublicKey.public_key,
+          height: getHeight.current_block_height,
+          mtokens: (BigInt(invoice.tokens) * mtokensPerToken).toString(),
+          payment: invoice.payment,
+          total_mtokens: !!invoice.payment ? invoice.mtokens : undefined,
+        });
+
+        const [discounted] = routes;
+
+        const dif = BigInt(route.fee_mtokens) - BigInt(discounted.fee_mtokens);
+
+        return cbk(null, {
+          lowered: tokAsBigTok(Number(dif / mtokensPerToken)),
+          route: discounted,
+        });
+      }],
+
       // Execute the rebalance
-      pay: ['invoice', 'lnd', 'routes', ({invoice, lnd, routes}, cbk) => {
+      pay: ['discount', 'invoice', 'lnd', ({discount, invoice, lnd}, cbk) => {
+        const routes = [discount.route];
+
         return payViaRoutes({lnd, routes, id: invoice.id}, (err, res) => {
           if (!!err) {
             return cbk([503, 'UnexpectedErrExecutingRebalance', {err}]);
@@ -801,6 +831,19 @@ module.exports = (args, cbk) => {
             tokens: res.tokens,
           });
         });
+      }],
+
+      // Calculate rebalance time
+      time: ['pay', ({}, cbk) => {
+        // Exit early when no start time was specified
+        if (!args.start) {
+          return cbk();
+        }
+
+        const end = new moment();
+        const start = new moment(new Date(args.start));
+
+        return cbk(null, moment.duration(end.diff(start)).humanize());
       }],
 
       // Get adjusted inbound liquidity after rebalance
@@ -825,17 +868,21 @@ module.exports = (args, cbk) => {
 
       // Final rebalancing outcome
       rebalance: [
+        'discount',
         'getAdjustedInbound',
         'getAdjustedOutbound',
         'getInbound',
         'getOutbound',
         'pay',
+        'time',
         ({
+          discount,
           getAdjustedInbound,
           getAdjustedOutbound,
           getInbound,
           getOutbound,
           pay,
+          time,
         },
         cbk) =>
       {
@@ -852,6 +899,8 @@ module.exports = (args, cbk) => {
         const outPendingOut = getAdjustedOutbound.outbound_pending;
 
         return cbk(null, {
+          got_inbound_fee_discount: discount.lowered,
+          total_execution_time: time,
           rebalance: [
             {
               increased_inbound_on: inOn,

@@ -23,8 +23,9 @@ const {versionJsonRpc} = require('./lsps1_protocol');
 
 const blocksAsMs = blocks => blocks * 10 * 60 * 1000;
 const blocksPerYear = 144 * 365;
-const capacityFee = (rate, capacity) => Math.floor(rate * capacity / 1e6 / 4);
+const capacityFee = (rate, capacity) => Math.floor(rate * capacity / 1e6);
 const decodeMessage = n => Buffer.from(n, 'hex').toString();
+const describeBlocks = blocks => `${(blocks / 144).toFixed(2)} days`;
 const encodeMessage = n => Buffer.from(n, 'utf8').toString('hex');
 const expiryDate = ms => new Date(Date.now() + ms).toISOString();
 const {floor} = Math;
@@ -337,7 +338,17 @@ module.exports = (args, cbk) => {
 
         const capacityFees = capacityFee(ppmFees, getMessage.capacity);
 
-        const ppmTotalFee = floor(time * capacityFees);
+        const ppmTotalFee = Math.ceil(time * capacityFees);
+
+        args.logger.info({
+          request: {
+            capacity: tokensAsBigUnit(getMessage.capacity),
+            lifetime: describeBlocks(getMessage.params.channel_expiry_blocks),
+            ppm_fee: tokensAsBigUnit(ppmTotalFee),
+            base_fee: tokensAsBigUnit(baseFee),
+            chain_fee: tokensAsBigUnit(estimatedChainFee),
+          },
+        });
 
         return cbk(null, {
           capacity: getMessage.capacity,
@@ -436,6 +447,7 @@ module.exports = (args, cbk) => {
         }
 
         const confTarget = message.params.funding_confirms_within_blocks;
+        const requiredConfs = message.params.required_channel_confirmations;
 
         const response = stringify({
           id: message.id,
@@ -443,24 +455,23 @@ module.exports = (args, cbk) => {
           result: {
             announce_channel: !!message.params.announce_channel,
             channel: null,
-            channel_expiry_blocks: defaultLifetimeBlocks,
+            channel_expiry_blocks: message.params.channel_expiry_blocks,
             client_balance_sat: Number().toString(),
             funding_confirms_within_blocks: confTarget,
             created_at: new Date().toISOString(),
-            expires_at: expiryDate(orderExpiryMs),
             lsp_balance_sat: message.params.lsp_balance_sat,
             order_id: message.order,
             order_state: orderStateCreated,
             payment: {
-              bolt11_invoice: makeInvoice.request,
-              fee_total_sat: makeInvoice.tokens.toString(),
-              min_fee_for_0conf: null,
-              min_onchain_payment_confirmations: null,
-              onchain_address: null,
-              onchain_payment: null,
-              order_total_sat: makeInvoice.tokens.toString(),
-              state: paymentStateExpectedPayment,
+              bolt11: {
+                expires_at: expiryDate(orderExpiryMs),
+                fee_total_sat: makeInvoice.tokens.toString(),
+                invoice: makeInvoice.request,
+                order_total_sat: makeInvoice.tokens.toString(),
+                state: paymentStateExpectedPayment,
+              },
             },
+            required_channel_confirmations: requiredConfs,
             token: String(),
           },
         });

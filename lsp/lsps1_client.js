@@ -145,6 +145,10 @@ module.exports = (args, cbk) => {
           return cbk([404, 'NoServicesOfferingChannelsFound']);
         }
 
+        args.logger.info({
+          services: services.map(n => `${n.alias} ${n.public_key}`.trim()),
+        });
+
         return args.ask({
           choices: services.map(node => ({
             name: `${node.alias} ${node.public_key}`,
@@ -271,11 +275,15 @@ module.exports = (args, cbk) => {
           return cbk([503, 'UnexpectedMissingQuoteInLsps1OpenQuoteResponse']);
         }
 
+        if (!getQuote.response.payment.bolt11) {
+          return cbk([503, 'UnexpectedMissingBolt11InLsps1OpenQuoteResponse']);
+        }
+
         if (!getQuote.response.order_id) {
           return cbk([503, 'UnexpectedAbsentOrderIdInLsps1OpenQuoteResponse']);
         }
 
-        const request = getQuote.response.payment.bolt11_invoice;
+        const request = getQuote.response.payment.bolt11.invoice;
 
         if (!request) {
           return cbk([503, 'UnexpectedMissingPaymentRequestInQuoteResponse']);
