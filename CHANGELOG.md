@@ -1,5 +1,25 @@
 # Versions
 
+## 19.4.4
+
+- `fund`: Explicitly disallow funding of txs with fractional fee rates
+
+## 19.4.3
+
+- `rebalance`: Correct for new fee buffer on close-to-balance rebalances
+
+## 19.4.0
+
+- `create-fanout-group`, `join-fanout-group`: add commands for collab fanout
+
+## 19.3.5
+
+- Probing at low local balance value channels now corrects for fee buffer
+
+## 19.3.3
+
+- Add support for LND 0.18.3
+
 ## 19.3.1
 
 - `fund`: Fix validation for funding when using `--select-utxos`
