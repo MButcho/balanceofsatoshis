@@ -1,5 +1,33 @@
 # Versions
 
+## 19.4.15
+
+- Add support for LND 0.19.1
+
+## 19.4.14
+
+- Add support for LND 0.19.0
+
+## 19.4.13
+
+- `open`: remove legacy LND support for `--set-fee-rate`
+
+## 19.4.12
+
+- `report`: remove fiat
+
+## 19.4.10
+
+- Add support for LND 0.18.5
+
+## 19.4.9
+
+- `report`: Change fiat rate provider
+
+## 19.4.8
+
+- `invoice`: Add `--virtual` inbound channel logging
+
 ## 19.4.7
 
 - Add support for LND 0.18.4
