@@ -1,5 +1,17 @@
 # Versions
 
+## 19.5.5
+
+- Add support for LND 0.19.3
+
+## 19.5.4
+
+- Add support for LND 0.19.2
+
+## 19.5.3
+
+- `remove-peer`: Avoid query mempool size when chain fee rate is specified
+
 ## 19.5.1
 
 - `open`: allow going below safety minimum on remote reserve via
