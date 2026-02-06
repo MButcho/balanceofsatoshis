@@ -7,6 +7,7 @@ Commands for working with LND balances.
 
 Supported LND versions:
 
+- v0.20.0-beta
 - v0.19.0-beta to v0.19.3-beta
 - v0.18.0-beta to v0.18.5-beta
 - v0.17.0-beta to v0.17.5-beta
@@ -15,7 +16,7 @@ Supported LND versions:
 
 ## Install
 
-- Requires an [installation of Node v18+][nodejs-install-guide]
+- Requires an [installation of Node v20+][nodejs-install-guide]
 
 ```shell
 npm install -g balanceofsatoshis
@@ -49,18 +50,6 @@ bos help
 
 # Or get individual help with a command
 bos help commandName
-```
-
-If you want autocomplete on commands and options you can do:
-
-```
-bos install-completion
-```
-
-Or to remove autocomplete
-
-```shell
-bos uninstall-completion
 ```
 
 ## Community
