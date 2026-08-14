@@ -1,6 +1,63 @@
 # Versions
 
-## 20.0.2
+## 23.1.6
+
+- Add support for LND 0.21.2
+- Add support for LND 0.20.3
+
+## 23.1.5
+
+- Dependency cleanup: remove minimist dependency
+
+## 23.1.3
+
+- Dependency cleanup: remove crypto js dependency
+
+## 23.1.2
+
+- Add `--avoid-append` to add failing edges to an avoid list based on formula
+- Add support for LND 0.20.2
+
+## 23.0.0
+
+### Breaking Changes
+
+- Remove support for extended range of formulas, supported formulas are here:
+    https://github.com/alexbosworth/formulas#custom-functions
+
+## 22.1.7
+
+- Add support for LND 0.21.1
+
+## 22.1.4
+
+- Improve support for SOCKS proxy on old node versions
+
+## 22.1.0
+
+- Add support for LND 0.21.0
+
+## 22.0.2
+
+### Breaking Changes
+
+- Remove support for LND 0.19 and below
+
+## 21.0.0
+
+### Breaking Changes
+
+- Remove support for node.js 20, 22+ is now required
+
+## 20.1.5
+
+- `rebalance`: support for `--avoid_list` to move `--avoid` flags to a file
+
+## 20.0.5
+
+- Add support for LND 0.20.1
+
+## 20.0.3
 
 - Bump Docker node.js version
 

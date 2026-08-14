@@ -7,12 +7,8 @@ Commands for working with LND balances.
 
 Supported LND versions:
 
-- v0.20.0-beta
-- v0.19.0-beta to v0.19.3-beta
-- v0.18.0-beta to v0.18.5-beta
-- v0.17.0-beta to v0.17.5-beta
-- v0.16.0-beta to v0.16.4-beta
-- v0.15.2-beta to v0.15.5-beta
+- v0.21.0-beta to v0.21.2-beta
+- v0.20.0-beta to v0.20.3-beta
 
 ## Install
 
@@ -568,8 +564,11 @@ alias bosd="docker run -d --rm -v $HOME/.bos:/home/node/.bos alexbosworth/balanc
 Some commands take formula arguments. Formulas are expressions that allow you 
 to perform functions and reference variables.
 
-There is a dynamic playground here where you can play with expressions:
-https://formulajs.info/functions/
+Formulas are modeled after common spreadsheet formulas, but there is not a 1:1
+mapping of supported functions from all spreadsheets.
+
+See supported formula construction here:
+https://github.com/alexbosworth/formulas#custom-functions
 
 ### `--avoid`
 
